@@ -21,3 +21,11 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+
+# Local AI / Boost tooling files
+/.agents
+/.codex
+/.github/skills
+/AGENTS.md
+/boost.json
+/opencode.json
