@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="dark">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
         @include('partials.head')
     </head>
@@ -16,18 +16,32 @@
                         {{ __('Dashboard') }}
                     </flux:sidebar.item>
                 </flux:sidebar.group>
+
+                <flux:sidebar.group :heading="__('Events')" class="grid">
+                    @forelse (auth()->user()->events()->orderBy('name')->get() as $event)
+                        <flux:sidebar.item icon="calendar" :href="route('events.show', $event)" :current="request()->routeIs('events.show') && request()->route('event')?->is($event)" wire:navigate>
+                            {{ $event->name }}
+                        </flux:sidebar.item>
+                    @empty
+                        <flux:sidebar.item icon="calendar" disabled>
+                            {{ __('No events yet') }}
+                        </flux:sidebar.item>
+                    @endforelse
+                </flux:sidebar.group>
             </flux:sidebar.nav>
 
             <flux:spacer />
 
             <flux:sidebar.nav>
-                <flux:sidebar.item icon="folder-git-2" href="https://github.com/laravel/livewire-starter-kit" target="_blank">
-                    {{ __('Repository') }}
-                </flux:sidebar.item>
-
-                <flux:sidebar.item icon="book-open-text" href="https://laravel.com/docs/starter-kits#livewire" target="_blank">
-                    {{ __('Documentation') }}
-                </flux:sidebar.item>
+                @if (auth()->user()->hasRole('admin'))
+                    <flux:sidebar.item icon="cog-6-tooth" :href="route('admin.settings.users')" :current="request()->routeIs('admin.settings.*')" wire:navigate>
+                        {{ __('Settings') }}
+                    </flux:sidebar.item>
+                @else
+                    <flux:sidebar.item icon="cog-6-tooth" :href="route('profile.edit')" :current="request()->routeIs('profile.*')" wire:navigate>
+                        {{ __('Settings') }}
+                    </flux:sidebar.item>
+                @endif
             </flux:sidebar.nav>
 
             <x-desktop-user-menu class="hidden lg:block" :name="auth()->user()->name" />
@@ -66,9 +80,15 @@
                     <flux:menu.separator />
 
                     <flux:menu.radio.group>
-                        <flux:menu.item :href="route('profile.edit')" icon="cog" wire:navigate>
-                            {{ __('Settings') }}
-                        </flux:menu.item>
+                        @if (auth()->user()->hasRole('admin'))
+                            <flux:menu.item :href="route('admin.settings.users')" icon="cog" wire:navigate>
+                                {{ __('Settings') }}
+                            </flux:menu.item>
+                        @else
+                            <flux:menu.item :href="route('profile.edit')" icon="cog" wire:navigate>
+                                {{ __('Settings') }}
+                            </flux:menu.item>
+                        @endif
                     </flux:menu.radio.group>
 
                     <flux:menu.separator />

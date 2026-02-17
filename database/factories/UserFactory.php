@@ -56,4 +56,26 @@ class UserFactory extends Factory
             'two_factor_confirmed_at' => now(),
         ]);
     }
+
+    /**
+     * Indicate that the user should have the admin role.
+     */
+    public function admin(): static
+    {
+        return $this->afterCreating(function (\App\Models\User $user): void {
+            \Spatie\Permission\Models\Role::findOrCreate('admin');
+            $user->assignRole('admin');
+        });
+    }
+
+    /**
+     * Indicate that the user should have the user role.
+     */
+    public function regularUser(): static
+    {
+        return $this->afterCreating(function (\App\Models\User $user): void {
+            \Spatie\Permission\Models\Role::findOrCreate('user');
+            $user->assignRole('user');
+        });
+    }
 }
