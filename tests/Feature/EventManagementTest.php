@@ -54,6 +54,33 @@ test('admin can create more than two events', function () {
     expect(Event::query()->where('created_by', $admin->id)->count())->toBe(3);
 });
 
+test('admin sees their events and other users events in separate sections', function () {
+    Role::findOrCreate('admin');
+    Role::findOrCreate('user');
+
+    $admin = User::factory()->admin()->create();
+    $otherUser = User::factory()->regularUser()->create();
+
+    Event::factory()->create([
+        'name' => 'Admin Team Event',
+        'created_by' => $admin->id,
+    ]);
+
+    Event::factory()->create([
+        'name' => 'Other Team Event',
+        'created_by' => $otherUser->id,
+    ]);
+
+    $response = $this->actingAs($admin)->get(route('events.index'));
+
+    $response->assertOk()
+        ->assertSee('Your Events')
+        ->assertSee("Other People's Events")
+        ->assertSee('Admin Team Event')
+        ->assertSee('Other Team Event')
+        ->assertSee($otherUser->name);
+});
+
 test('event creator can invite users when creating and updating an event', function () {
     Role::findOrCreate('user');
 
