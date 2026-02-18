@@ -262,16 +262,18 @@ new class extends Component {
         <div class="space-y-3">
 
 
-            <div class="flex flex-wrap items-center justify-between">
+            <div class="flex items-center justify-between">
 
                 <div class="flex flex-wrap items-center gap-4">
-                    <flux:button wire:key="calendar-previous" type="button" variant="primary" size="sm"
+                    <flux:button wire:key="calendar-previous" type="button" variant="ghost" size="sm"
                         icon="chevron-left" wire:click.prevent="goToPreviousMonth" :loading="false"
                         :label="__('Previous month')" />
 
-                    <flux:heading class="min-w-32 text-center" size="lg">{{ $this->monthStart->format('F Y') }}</flux:heading>
+                    <flux:heading size="md">{{ $this->monthStart->format('F Y') }}</flux:heading>
 
-                    <flux:button wire:key="calendar-next" type="button" variant="primary" size="sm"
+
+
+                    <flux:button wire:key="calendar-next" type="button" variant="ghost" size="sm"
                         icon="chevron-right" wire:click.prevent="goToNextMonth" :loading="false"
                         :label="__('Next month')" />
                 </div>

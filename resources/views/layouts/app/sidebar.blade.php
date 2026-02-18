@@ -22,17 +22,7 @@
             </flux:sidebar.group>
 
             <flux:sidebar.group expandable :heading="__('Events')" class="grid">
-                @forelse (auth()->user()->events()->orderBy('name')->get() as $event)
-                    <flux:sidebar.item icon="calendar" :href="route('events.show', $event)"
-                        :current="request()->routeIs('events.show') && request()->route('event')?->is($event)"
-                        wire:navigate>
-                        {{ $event->name }}
-                    </flux:sidebar.item>
-                @empty
-                    <flux:sidebar.item icon="calendar" disabled>
-                        {{ __('No events yet') }}
-                    </flux:sidebar.item>
-                @endforelse
+                <livewire:layout.sidebar-events />
             </flux:sidebar.group>
         </flux:sidebar.nav>
 
