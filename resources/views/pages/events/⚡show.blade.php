@@ -258,10 +258,8 @@ new class extends Component {
     </div>
 
     <flux:heading size="lg">{{ __('Availability Calendar') }}</flux:heading>
-    <flux:card>
+    <flux:card x-cloak>
         <div class="space-y-3">
-
-
             <div class="flex items-center justify-between">
 
                 <div class="flex flex-wrap items-center gap-4">
