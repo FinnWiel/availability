@@ -4,7 +4,8 @@ use Laravel\Fortify\Actions\GenerateNewRecoveryCodes;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
-new class extends Component {
+new class extends Component
+{
     #[Locked]
     public array $recoveryCodes = [];
 
@@ -107,7 +108,7 @@ new class extends Component {
         >
             <div class="mt-3 space-y-3">
                 @error('recoveryCodes')
-                    <flux:callout variant="danger" icon="x-circle" heading="{{$message}}"/>
+                    <div x-data x-init="$flux.toast({ text: @js($message), variant: 'danger' })"></div>
                 @enderror
 
                 @if (filled($recoveryCodes))

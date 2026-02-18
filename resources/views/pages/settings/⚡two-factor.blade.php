@@ -10,7 +10,8 @@ use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Symfony\Component\HttpFoundation\Response;
 
-new class extends Component {
+new class extends Component
+{
     #[Locked]
     public bool $twoFactorEnabled;
 
@@ -299,7 +300,7 @@ new class extends Component {
                 </div>
             @else
                 @error('setupData')
-                    <flux:callout variant="danger" icon="x-circle" heading="{{ $message }}"/>
+                    <div x-data x-init="$flux.toast({ text: @js($message), variant: 'danger' })"></div>
                 @enderror
 
                 <div class="flex justify-center">
