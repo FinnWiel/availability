@@ -22,6 +22,18 @@
             <flux:menu.item :href="route('profile.edit')" icon="cog" wire:navigate>
                 {{ __('Settings') }}
             </flux:menu.item>
+
+            @if (auth()->user()->isImpersonated())
+                <form method="POST" action="{{ route('impersonation.leave') }}" class="w-full">
+                    @csrf
+
+                    <flux:menu.item as="button" type="submit" icon="arrow-uturn-left"
+                        class="w-full cursor-pointer">
+                        {{ __('Leave Impersonation') }}
+                    </flux:menu.item>
+                </form>
+            @endif
+
             <form method="POST" action="{{ route('logout') }}" class="w-full">
                 @csrf
                 <flux:menu.item

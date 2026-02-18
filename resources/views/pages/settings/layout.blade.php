@@ -7,6 +7,10 @@
                 <flux:navlist.item :href="route('two-factor.show')" wire:navigate>{{ __('Two-Factor Auth') }}</flux:navlist.item>
             @endif
             <flux:navlist.item :href="route('appearance.edit')" wire:navigate>{{ __('Appearance') }}</flux:navlist.item>
+
+            @if (auth()->user()?->hasRole('admin'))
+                <flux:navlist.item :href="route('admin.settings.users')" wire:navigate>{{ __('Users') }}</flux:navlist.item>
+            @endif
         </flux:navlist>
     </div>
 
@@ -16,7 +20,7 @@
         <flux:heading>{{ $heading ?? '' }}</flux:heading>
         <flux:subheading>{{ $subheading ?? '' }}</flux:subheading>
 
-        <div class="mt-5 w-full max-w-lg">
+        <div class="mt-5 w-full {{ request()->routeIs('admin.settings.*') ? 'max-w-none' : 'max-w-lg' }}">
             {{ $slot }}
         </div>
     </div>

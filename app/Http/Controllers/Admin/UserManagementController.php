@@ -3,34 +3,17 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Admin\DeleteEventRequest;
 use App\Http\Requests\Admin\DeleteUserRequest;
-use App\Http\Requests\Admin\StoreEventRequest;
-use App\Http\Requests\Admin\UpdateEventRequest;
 use App\Http\Requests\Admin\UpdateUserEventsRequest;
 use App\Http\Requests\Admin\UpdateUserRoleRequest;
 use App\Models\Event;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\View\View;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class UserManagementController extends Controller
 {
-    public function users(): View
-    {
-        return view('admin.settings.users', [
-            'users' => User::query()->with('roles')->orderBy('name')->get(),
-        ]);
-    }
-
-    public function events(): View
-    {
-        return view('admin.settings.events', [
-            'events' => Event::query()->with('users:id')->withCount('users')->orderBy('name')->get(),
-            'users' => User::query()->orderBy('name')->get(),
-        ]);
-    }
-
     public function updateRole(UpdateUserRoleRequest $request, User $user): RedirectResponse
     {
         $user->syncRoles([$request->string('role')->toString()]);
@@ -38,36 +21,18 @@ class UserManagementController extends Controller
         return back()->with('status', 'User role updated successfully.');
     }
 
-    public function storeEvent(StoreEventRequest $request): RedirectResponse
-    {
-        Event::query()->create([
-            'name' => $request->string('name')->toString(),
-            'color' => strtoupper($request->string('color')->toString()),
-        ]);
-
-        return to_route('admin.settings.events')
-            ->with('status', 'Event created successfully.');
-    }
-
     public function updateEvents(UpdateUserEventsRequest $request, User $user): RedirectResponse
     {
-        $user->events()->sync($request->input('events', []));
+        $eventIds = Event::query()->whereIn('id', $request->input('events', []));
 
-        return to_route('admin.settings.events')
+        if (! $request->user()?->hasRole('admin')) {
+            $eventIds->where('created_by', $request->user()?->id);
+        }
+
+        $user->events()->sync($eventIds->pluck('id'));
+
+        return to_route('admin.settings.users')
             ->with('status', 'User events updated successfully.');
-    }
-
-    public function updateEvent(UpdateEventRequest $request, Event $event): RedirectResponse
-    {
-        $event->update([
-            'name' => $request->string('name')->toString(),
-            'color' => strtoupper($request->string('color')->toString()),
-        ]);
-
-        $event->users()->sync($request->input('users', []));
-
-        return to_route('admin.settings.events')
-            ->with('status', 'Event updated successfully.');
     }
 
     public function destroyUser(DeleteUserRequest $request, User $user): RedirectResponse
@@ -82,11 +47,21 @@ class UserManagementController extends Controller
             ->with('status', 'User deleted successfully.');
     }
 
-    public function destroyEvent(DeleteEventRequest $request, Event $event): RedirectResponse
+    public function impersonate(Request $request, User $user): RedirectResponse
     {
-        $event->delete();
+        $authorization = Gate::inspect('impersonate', $user);
 
-        return to_route('admin.settings.events')
-            ->with('status', 'Event deleted successfully.');
+        if ($authorization->denied()) {
+            if (filled($authorization->message())) {
+                return back()->withErrors([$authorization->message()]);
+            }
+
+            abort(403);
+        }
+
+        $request->user()?->impersonate($user);
+
+        return to_route('dashboard')
+            ->with('status', 'You are now impersonating '.$user->name.'.');
     }
 }
