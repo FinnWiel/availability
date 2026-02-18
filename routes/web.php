@@ -4,36 +4,13 @@ use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\EventManagementController;
 use App\Http\Controllers\ImpersonationController;
-use App\Models\Event;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return view('welcome');
 })->name('home');
 
-Route::get('dashboard', function () {
-    $nextAvailability = request()->user()
-        ?->eventAvailabilities()
-        ->where('available_at', '>=', now())
-        ->orderBy('available_at')
-        ->first();
-
-    $nextAvailableUsers = collect();
-
-    if ($nextAvailability?->event_id !== null) {
-        $nextAvailableUsers = Event::query()
-            ->with('users:id,name,email')
-            ->find($nextAvailability->event_id)
-            ?->users
-            ->values() ?? collect();
-    }
-
-    return view('dashboard', [
-        'nextAvailableDateTime' => $nextAvailability?->available_at,
-        'nextAvailabilityLocation' => $nextAvailability?->location,
-        'nextAvailableUsers' => $nextAvailableUsers,
-    ]);
-})->middleware(['auth', 'verified'])->name('dashboard');
+Route::livewire('dashboard', 'pages::dashboard')->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware(['auth', 'verified'])
     ->group(function (): void {
