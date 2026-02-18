@@ -36,6 +36,7 @@ class StoreEventAvailabilityRequest extends FormRequest
         return [
             'date' => ['required', 'date_format:Y-m-d'],
             'time' => ['required', 'regex:/^(all-day|([01]\\d|2[0-3]):(00|30))$/'],
+            'location' => ['nullable', 'string', 'in:my-place'],
         ];
     }
 
@@ -48,6 +49,7 @@ class StoreEventAvailabilityRequest extends FormRequest
             'date.required' => 'Please choose a date from the calendar.',
             'time.required' => 'Please choose a time for your availability.',
             'time.regex' => 'Please choose a valid time or all day.',
+            'location.in' => 'Please choose a valid location option.',
         ];
     }
 }

@@ -8,7 +8,8 @@ use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
-new class extends Component {
+new class extends Component
+{
     public Event $event;
 
     public ?CarbonInterface $nextCommonDateTime = null;
@@ -25,6 +26,8 @@ new class extends Component {
     public ?string $selectedDayLabel = null;
 
     public string $selectedTime = 'all-day';
+
+    public bool $selectedAtMyPlace = false;
 
     public function mount(Event $event, ?CarbonInterface $nextCommonDateTime, Collection $userAvailabilitySlots): void
     {
@@ -57,6 +60,8 @@ new class extends Component {
         $this->selectedDate = $date;
         $this->selectedDayLabel = $label;
         $this->selectedTime = 'all-day';
+
+        $this->selectedAtMyPlace = $this->userAvailabilitySlots->first(fn ($availability) => $availability->available_at->toDateString() === $date)?->location === 'my-place';
     }
 
     public function addAvailability(): void
@@ -72,14 +77,51 @@ new class extends Component {
         }
 
         $isAllDay = $this->selectedTime === 'all-day';
-        $availableAt = $isAllDay ? Carbon::createFromFormat('Y-m-d', $this->selectedDate, config('app.timezone'))->startOfDay() : Carbon::createFromFormat('Y-m-d H:i', $this->selectedDate . ' ' . $this->selectedTime, config('app.timezone'))->seconds(0);
+        $availableAt = $isAllDay ? Carbon::createFromFormat('Y-m-d', $this->selectedDate, config('app.timezone'))->startOfDay() : Carbon::createFromFormat('Y-m-d H:i', $this->selectedDate.' '.$this->selectedTime, config('app.timezone'))->seconds(0);
+        $location = $this->selectedAtMyPlace ? 'my-place' : null;
 
-        EventAvailability::query()->firstOrCreate([
-            'event_id' => $this->event->id,
-            'user_id' => $currentUser->id,
-            'available_at' => $availableAt,
-            'is_all_day' => $isAllDay,
-        ]);
+        $availability = EventAvailability::query()->firstOrCreate(
+            [
+                'event_id' => $this->event->id,
+                'user_id' => $currentUser->id,
+                'available_at' => $availableAt,
+            ],
+            [
+                'is_all_day' => $isAllDay,
+                'location' => $location,
+            ],
+        );
+
+        if ($availability->is_all_day !== $isAllDay || $availability->location !== $location) {
+            $availability->update([
+                'is_all_day' => $isAllDay,
+                'location' => $location,
+            ]);
+        }
+
+        $this->event->load(['users:id,name,email', 'availabilities.user:id,name,email']);
+        $this->userAvailabilitySlots = $this->event->availabilities->where('user_id', $currentUser->id)->sortBy('available_at')->values();
+    }
+
+    public function saveLocation(): void
+    {
+        if ($this->selectedDate === null) {
+            return;
+        }
+
+        $currentUser = request()->user();
+
+        if ($currentUser === null) {
+            return;
+        }
+
+        EventAvailability::query()
+            ->where('event_id', $this->event->id)
+            ->where('user_id', $currentUser->id)
+            ->whereDate('available_at', $this->selectedDate)
+            ->update([
+                'location' => $this->selectedAtMyPlace ? 'my-place' : null,
+            ]);
 
         $this->event->load(['users:id,name,email', 'availabilities.user:id,name,email']);
         $this->userAvailabilitySlots = $this->event->availabilities->where('user_id', $currentUser->id)->sortBy('available_at')->values();
@@ -98,6 +140,8 @@ new class extends Component {
         }
 
         EventAvailability::query()->where('event_id', $this->event->id)->where('user_id', $currentUser->id)->whereDate('available_at', $this->selectedDate)->delete();
+
+        $this->selectedAtMyPlace = false;
 
         $this->event->load(['users:id,name,email', 'availabilities.user:id,name,email']);
         $this->userAvailabilitySlots = $this->event->availabilities->where('user_id', $currentUser->id)->sortBy('available_at')->values();
@@ -136,7 +180,7 @@ new class extends Component {
     #[Computed]
     public function availabilityCounts(): Collection
     {
-        return $this->event->availabilities->groupBy(fn($availability) => $availability->available_at->toDateString())->map(fn($availabilities) => $availabilities->pluck('user_id')->unique()->count());
+        return $this->event->availabilities->groupBy(fn ($availability) => $availability->available_at->toDateString())->map(fn ($availabilities) => $availabilities->pluck('user_id')->unique()->count());
     }
 
     /**
@@ -145,9 +189,23 @@ new class extends Component {
     #[Computed]
     public function availabilityUsersByDate(): Collection
     {
-        return $this->event->availabilities->groupBy(fn($availability) => $availability->available_at->toDateString())->map(function (Collection $availabilities): Collection {
-            return $availabilities->map(fn($availability) => $availability->user)->filter()->unique('id')->values();
+        return $this->event->availabilities->groupBy(fn ($availability) => $availability->available_at->toDateString())->map(function (Collection $availabilities): Collection {
+            return $availabilities->map(fn ($availability) => $availability->user)->filter()->unique('id')->values();
         });
+    }
+
+    /**
+     * @return Collection<string, Collection<int, string>>
+     */
+    #[Computed]
+    public function hostNamesByDate(): Collection
+    {
+        return $this->event->availabilities
+            ->filter(fn ($availability): bool => $availability->location === 'my-place' && $availability->user !== null)
+            ->groupBy(fn ($availability) => $availability->available_at->toDateString())
+            ->map(function (Collection $availabilities): Collection {
+                return $availabilities->map(fn ($availability): string => $availability->user->name)->unique()->values();
+            });
     }
 
     /**
@@ -156,7 +214,7 @@ new class extends Component {
     #[Computed]
     public function myAvailabilityDates(): Collection
     {
-        return $this->userAvailabilitySlots->groupBy(fn($availability) => $availability->available_at->toDateString())->keys();
+        return $this->userAvailabilitySlots->groupBy(fn ($availability) => $availability->available_at->toDateString())->keys();
     }
 
     /**
@@ -215,11 +273,41 @@ new class extends Component {
 
         return $this->myAvailabilityDates->contains($this->selectedDate);
     }
+
+    /**
+     * @return Collection<int, array{name: string, location: string}>
+     */
+    #[Computed]
+    public function selectedDayLocations(): Collection
+    {
+        if ($this->selectedDate === null) {
+            return collect();
+        }
+
+        return $this->event->availabilities
+            ->filter(function ($availability): bool {
+                return $availability->available_at->toDateString() === $this->selectedDate && filled($availability->location) && $availability->user !== null;
+            })
+            ->groupBy('user_id')
+            ->map(function (Collection $availabilities): array {
+                $availability = $availabilities->first();
+
+                return [
+                    'name' => $availability->user->name,
+                    'location' => $availability->location === 'my-place' ? __('At their place') : __('Location provided'),
+                ];
+            })
+            ->values();
+    }
 };
 ?>
 
-<div class="space-y-4" x-data="{ openDay(day) { $store.calendarDay.day = day;
-        $flux.modal('calendar-day-modal').show(); } }" x-init="if (!$store.calendarDay) { Alpine.store('calendarDay', { day: { label: '', date: '', attendeeCount: 0, hasMyAvailability: false } }); }">
+<div class="space-y-4" x-data="{
+    openDay(day) {
+        $store.calendarDay.day = day;
+        $flux.modal('calendar-day-modal').show();
+    }
+}" x-init="if (!$store.calendarDay) { Alpine.store('calendarDay', { day: { label: '', date: '', attendeeCount: 0, hasMyAvailability: false } }); }">
     <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
             <flux:heading size="xl">{{ $event->name }}</flux:heading>
@@ -264,10 +352,12 @@ new class extends Component {
                 @foreach ($this->calendarDays as $day)
                     @php
                         $availableUsers = $this->availabilityUsersByDate->get($day['date'], collect());
+                        $hostNames = $this->hostNamesByDate->get($day['date'], collect());
                     @endphp
 
                     <button type="button" wire:click="setSelectedDay('{{ $day['date'] }}', '{{ $day['label'] }}')"
-                        class="h-full aspect-square rounded-lg border p-2 text-left transition hover:border-zinc-400 hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:hover:border-zinc-600 dark:hover:bg-zinc-800/60 {{ $day['inCurrentMonth'] ? 'border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900/50' : 'border-zinc-100 bg-zinc-50/70 text-zinc-400 dark:border-zinc-800 dark:bg-zinc-900/20 dark:text-zinc-500' }} {{ $day['hasMyAvailability'] ? 'ring-1 ring-blue-500/40' : '' }} {{ $day['isCommonDay'] ? 'border-emerald-400/70 bg-emerald-50/50 dark:border-emerald-500/60 dark:bg-emerald-900/20' : '' }} {{ $day['isToday'] ? 'ring-2 ring-white' : '' }}"
+                        @if ($day['isCommonDay']) style="border-color: var(--color-accent); border-width: 2px; background-color: color-mix(in srgb, var(--color-accent) 10%, transparent);" @endif
+                        class="h-full aspect-square rounded-lg border p-2 text-left transition hover:border-zinc-400 hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:hover:border-zinc-600 dark:hover:bg-zinc-800/60 {{ $day['inCurrentMonth'] ? 'border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900/50' : 'border-zinc-100 bg-zinc-50/70 text-zinc-400 dark:border-zinc-800 dark:bg-zinc-900/20 dark:text-zinc-500' }} {{ $day['isCommonDay'] ? 'border-2 border-accent bg-accent/10 dark:border-accent dark:bg-accent/10' : '' }} {{ $day['isToday'] ? 'ring-2 ring-white' : '' }}"
                         x-on:click="openDay({
                             date: {{ \Illuminate\Support\Js::from($day['date']) }},
                             label: {{ \Illuminate\Support\Js::from($day['label']) }},
@@ -276,16 +366,37 @@ new class extends Component {
                             hasMyAvailability: {{ $day['hasMyAvailability'] ? 'true' : 'false' }}
                         })">
                         <div class="flex h-full flex-col justify-between">
-                            <div class="space-y-1">
-                                <div class="text-xs text-zinc-500 dark:text-zinc-400">
-                                    {{ trans_choice('{1} :count attendee|[2,*] :count attendees', $day['attendeeCount'], ['count' => $day['attendeeCount']]) }}
+                            <div class="flex items-start justify-between">
+                                <div class="flex flex-col items-start justify-between">
+                                    <div class="text-xs text-zinc-500 dark:text-zinc-400">
+                                        {{ trans_choice('{1} :count attendee|[2,*] :count attendees', $day['attendeeCount'], ['count' => $day['attendeeCount']]) }}
+                                    </div>
+                                    @if ($day['hasMyAvailability'])
+                                        <div class="text-xs font-medium text-accent">
+                                            {{ __('You are available') }}
+                                        </div>
+                                    @endif
+
                                 </div>
 
-                                @if ($day['hasMyAvailability'])
-                                    <div class="text-xs font-medium text-blue-600 dark:text-blue-400">
-                                        {{ __('You are available') }}
-                                    </div>
+                                @if ($hostNames->isNotEmpty())
+                                    <flux:tooltip position="bottom"
+                                        content="{{ $hostNames->implode(', ') }} {{ __('can host at their place') }}">
+                                        <span class="text-zinc-500 dark:text-zinc-400"
+                                            data-test="availability-host-pin-{{ $day['date'] }}">
+                                            <flux:icon.map-pin class="size-5" />
+                                        </span>
+                                    </flux:tooltip>
+                                @elseif ($day['isCommonDay'])
+                                    <flux:tooltip position="bottom" content="{{ __('No host location set yet') }}">
+                                        <span class="text-zinc-400 dark:text-zinc-500"
+                                            data-test="availability-host-pin-off-{{ $day['date'] }}">
+                                            <flux:icon.map-pin-off class="size-5" />
+                                        </span>
+                                    </flux:tooltip>
                                 @endif
+
+
                             </div>
 
                             <div class="flex items-end justify-between gap-2">
@@ -316,7 +427,7 @@ new class extends Component {
                                 @endif
 
                                 <div
-                                    class="text-right text-lg font-semibold leading-none {{ $day['inCurrentMonth'] ? 'text-zinc-900 dark:text-zinc-100' : '' }}">
+                                    class="text-right text-lg font-semibold leading-none {{ $day['isCommonDay'] ? 'text-accent' : ($day['inCurrentMonth'] ? 'text-zinc-900 dark:text-zinc-100' : '') }}">
                                     {{ $day['day'] }}
                                 </div>
                             </div>
@@ -325,17 +436,6 @@ new class extends Component {
                 @endforeach
             </div>
         </div>
-    </flux:card>
-
-    <flux:card>
-        <flux:heading size="md">{{ __('Next time everyone is available') }}</flux:heading>
-        <flux:text class="mt-2">
-            @if ($nextCommonDateTime)
-                {{ $nextCommonDateTime->timezone(config('app.timezone'))->format('D, M j Y g:i A') }}
-            @else
-                {{ __('No shared time slot yet.') }}
-            @endif
-        </flux:text>
     </flux:card>
 
     <flux:modal name="calendar-day-modal" class="md:w-96">
@@ -357,6 +457,21 @@ new class extends Component {
                 </div>
             </div>
 
+            @if ($this->selectedDayLocations->isNotEmpty())
+                <div class="rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
+                    <flux:heading size="sm">{{ __('Available locations') }}</flux:heading>
+
+                    <div class="mt-2 space-y-1 text-sm">
+                        @foreach ($this->selectedDayLocations as $locationEntry)
+                            <div class="text-zinc-700 dark:text-zinc-200">
+                                <span class="font-medium">{{ $locationEntry['name'] }}:</span>
+                                <span>{{ $locationEntry['location'] }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
             <flux:field>
                 <flux:label>{{ __('Time') }}</flux:label>
                 <flux:select wire:model="selectedTime">
@@ -369,10 +484,20 @@ new class extends Component {
             </flux:field>
 
             @if ($this->selectedDayHasMyAvailability)
-                <flux:button type="button" variant="danger" wire:click="removeAvailability" :loading="false"
-                    icon="trash" :label="__('Remove availability')">
-                    {{ __('Remove Availability') }}
-                </flux:button>
+                <flux:field>
+                    <flux:label>{{ __('Location preference') }}</flux:label>
+                    <flux:checkbox wire:model="selectedAtMyPlace" wire:change="saveLocation"
+                        :label="__('I can host at my place')" />
+                </flux:field>
+            @endif
+
+            @if ($this->selectedDayHasMyAvailability)
+                <div class="flex flex-wrap gap-2">
+                    <flux:button type="button" variant="danger" wire:click="removeAvailability" :loading="false"
+                        icon="trash" :label="__('Remove availability')">
+                        {{ __('Remove Availability') }}
+                    </flux:button>
+                </div>
             @else
                 <flux:button type="button" variant="primary" wire:click="addAvailability" :loading="false"
                     icon="plus-circle" :label="__('Add availability')">

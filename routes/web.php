@@ -2,6 +2,9 @@
 
 use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\EventController;
+use App\Http\Controllers\EventManagementController;
+use App\Http\Controllers\ImpersonationController;
+use App\Models\Event;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -9,21 +12,38 @@ Route::get('/', function () {
 })->name('home');
 
 Route::get('dashboard', function () {
-    $nextAvailableDateTime = request()->user()
+    $nextAvailability = request()->user()
         ?->eventAvailabilities()
         ->where('available_at', '>=', now())
         ->orderBy('available_at')
-        ->first()
-        ?->available_at;
+        ->first();
+
+    $nextAvailableUsers = collect();
+
+    if ($nextAvailability?->event_id !== null) {
+        $nextAvailableUsers = Event::query()
+            ->with('users:id,name,email')
+            ->find($nextAvailability->event_id)
+            ?->users
+            ->values() ?? collect();
+    }
 
     return view('dashboard', [
-        'nextAvailableDateTime' => $nextAvailableDateTime,
+        'nextAvailableDateTime' => $nextAvailability?->available_at,
+        'nextAvailabilityLocation' => $nextAvailability?->location,
+        'nextAvailableUsers' => $nextAvailableUsers,
     ]);
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware(['auth', 'verified'])
     ->group(function (): void {
-        Route::get('events/{event}', [EventController::class, 'show'])->name('events.show');
+        Route::livewire('events', 'pages::events.index')->name('events.index');
+        Route::post('events', [EventManagementController::class, 'store'])->name('events.store');
+        Route::patch('events/{event}', [EventManagementController::class, 'update'])->name('events.update');
+        Route::delete('events/{event}', [EventManagementController::class, 'destroy'])->name('events.destroy');
+        Route::post('impersonation/leave', [ImpersonationController::class, 'leave'])->name('impersonation.leave');
+
+        Route::livewire('events/{event}', 'pages::events.show')->name('events.show');
         Route::post('events/{event}/availability', [EventController::class, 'storeAvailability'])->name('events.availability.store');
         Route::delete('events/{event}/availability/{availability}', [EventController::class, 'destroyAvailability'])->name('events.availability.destroy');
     });
@@ -31,13 +51,9 @@ Route::middleware(['auth', 'verified'])
 Route::middleware(['auth', 'verified', 'role:admin'])
     ->name('admin.')
     ->group(function (): void {
-        Route::get('settings/users', [UserManagementController::class, 'users'])->name('settings.users');
-        Route::get('settings/events', [UserManagementController::class, 'events'])->name('settings.events');
-        Route::post('settings/events', [UserManagementController::class, 'storeEvent'])->name('events.store');
-        Route::patch('settings/events/{event}', [UserManagementController::class, 'updateEvent'])->name('events.update');
-        Route::delete('settings/events/{event}', [UserManagementController::class, 'destroyEvent'])->name('events.destroy');
         Route::patch('settings/users/{user}/role', [UserManagementController::class, 'updateRole'])->name('users.update-role');
         Route::patch('settings/users/{user}/events', [UserManagementController::class, 'updateEvents'])->name('users.update-events');
+        Route::post('settings/users/{user}/impersonate', [UserManagementController::class, 'impersonate'])->name('users.impersonate');
         Route::delete('settings/users/{user}', [UserManagementController::class, 'destroyUser'])->name('users.destroy');
     });
 

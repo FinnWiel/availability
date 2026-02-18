@@ -52,7 +52,9 @@ class EventController extends Controller
             'event_id' => $event->id,
             'user_id' => $request->user()->id,
             'available_at' => $availableAt,
+        ], [
             'is_all_day' => $isAllDay,
+            'location' => $request->string('location')->toString() === 'my-place' ? 'my-place' : null,
         ]);
 
         return to_route('events.show', $event)

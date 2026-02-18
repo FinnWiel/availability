@@ -1,17 +1,29 @@
 <?php
 
-namespace App\Http\Requests\Admin;
+namespace App\Http\Requests\Event;
 
+use App\Models\Event;
 use Illuminate\Foundation\Http\FormRequest;
 
-class DeleteEventRequest extends FormRequest
+class DeleteManagedEventRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
      */
     public function authorize(): bool
     {
-        return $this->user()?->hasRole('admin') ?? false;
+        /** @var Event $event */
+        $event = $this->route('event');
+
+        if (! $this->user()) {
+            return false;
+        }
+
+        if ($this->user()->hasRole('admin')) {
+            return true;
+        }
+
+        return $event->created_by === $this->user()->id;
     }
 
     /**

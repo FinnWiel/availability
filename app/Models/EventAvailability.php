@@ -20,6 +20,7 @@ class EventAvailability extends Model
         'user_id',
         'available_at',
         'is_all_day',
+        'location',
     ];
 
     /**

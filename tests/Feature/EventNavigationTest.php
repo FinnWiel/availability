@@ -23,7 +23,7 @@ test('user can view assigned event page', function () {
     Role::findOrCreate('user');
 
     $user = User::factory()->regularUser()->create();
-    $event = Event::factory()->create();
+    $event = Event::factory()->create(['color' => '#DC2626']);
     $user->events()->attach($event);
 
     $response = $this->actingAs($user)->get(route('events.show', $event));
@@ -83,6 +83,7 @@ test('event page shows next datetime when all users are available', function () 
         'event_id' => $event->id,
         'user_id' => $firstUser->id,
         'available_at' => $sharedDateTime,
+        'location' => 'my-place',
     ]);
 
     EventAvailability::query()->create([
@@ -94,9 +95,38 @@ test('event page shows next datetime when all users are available', function () 
     $response = $this->actingAs($firstUser)->get(route('events.show', $event));
 
     $response->assertOk()
-        ->assertSee('Next time everyone is available')
         ->assertSee('availability-avatar-'.$sharedDateTime->toDateString().'-user-'.$firstUser->id)
-        ->assertSee('availability-avatar-'.$sharedDateTime->toDateString().'-user-'.$secondUser->id);
+        ->assertSee('availability-avatar-'.$sharedDateTime->toDateString().'-user-'.$secondUser->id)
+        ->assertSee('availability-host-pin-'.$sharedDateTime->toDateString());
+});
+
+test('event page shows host pin off when all users are available without location', function () {
+    Role::findOrCreate('user');
+
+    $firstUser = User::factory()->regularUser()->create();
+    $secondUser = User::factory()->regularUser()->create();
+    $event = Event::factory()->create();
+
+    $event->users()->attach([$firstUser->id, $secondUser->id]);
+
+    $sharedDateTime = Carbon::parse('tomorrow 16:00');
+
+    EventAvailability::query()->create([
+        'event_id' => $event->id,
+        'user_id' => $firstUser->id,
+        'available_at' => $sharedDateTime,
+    ]);
+
+    EventAvailability::query()->create([
+        'event_id' => $event->id,
+        'user_id' => $secondUser->id,
+        'available_at' => $sharedDateTime,
+    ]);
+
+    $response = $this->actingAs($firstUser)->get(route('events.show', $event));
+
+    $response->assertOk()
+        ->assertSee('availability-host-pin-off-'.$sharedDateTime->toDateString());
 });
 
 test('event page includes attendees modal trigger', function () {
@@ -222,4 +252,41 @@ test('event modal shows add availability action when selected day is not availab
         ->call('setSelectedDay', $selectedDate, 'Tomorrow')
         ->assertSee('Add Availability')
         ->assertDontSee('Remove Availability');
+});
+
+test('assigned user can save hosting preference for selected day availability', function () {
+    Role::findOrCreate('user');
+
+    $user = User::factory()->regularUser()->create();
+    $event = Event::factory()->create();
+    $event->users()->attach($user);
+
+    $availableAt = Carbon::parse('tomorrow 10:00');
+
+    EventAvailability::query()->create([
+        'event_id' => $event->id,
+        'user_id' => $user->id,
+        'available_at' => $availableAt,
+    ]);
+
+    $this->actingAs($user);
+
+    Livewire::test('events.show-calendar', [
+        'event' => $event->fresh()->load(['users:id,name,email', 'availabilities.user:id,name,email']),
+        'nextCommonDateTime' => null,
+        'userAvailabilitySlots' => EventAvailability::query()
+            ->where('event_id', $event->id)
+            ->where('user_id', $user->id)
+            ->orderBy('available_at')
+            ->get(),
+    ])
+        ->call('setSelectedDay', $availableAt->toDateString(), 'Tomorrow')
+        ->set('selectedAtMyPlace', true)
+        ->call('saveLocation');
+
+    $this->assertDatabaseHas('event_availabilities', [
+        'event_id' => $event->id,
+        'user_id' => $user->id,
+        'location' => 'my-place',
+    ]);
 });

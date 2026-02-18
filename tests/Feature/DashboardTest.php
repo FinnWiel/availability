@@ -36,5 +36,44 @@ test('dashboard shows next available date for authenticated user', function () {
     $response->assertOk()
         ->assertSee('Next available date')
         ->assertSee($nextDateTime->format('D, M j Y'))
-        ->assertSee($nextDateTime->format('g:i A'));
+        ->assertSee($nextDateTime->format('g:i A'))
+        ->assertSee('dashboard-next-availability-host-pin-off');
+});
+
+test('dashboard shows host pin for next availability at my place', function () {
+    $user = User::factory()->create();
+    $event = Event::factory()->create();
+    $user->events()->attach($event);
+
+    EventAvailability::query()->create([
+        'event_id' => $event->id,
+        'user_id' => $user->id,
+        'available_at' => Carbon::parse('tomorrow 09:00'),
+        'location' => 'my-place',
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard'));
+
+    $response->assertOk()
+        ->assertSee('dashboard-next-availability-host-pin');
+});
+
+test('dashboard shows event attendees avatars for next available event', function () {
+    $user = User::factory()->create();
+    $otherUser = User::factory()->create();
+    $event = Event::factory()->create();
+
+    $event->users()->attach([$user->id, $otherUser->id]);
+
+    EventAvailability::query()->create([
+        'event_id' => $event->id,
+        'user_id' => $user->id,
+        'available_at' => Carbon::parse('tomorrow 11:00'),
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard'));
+
+    $response->assertOk()
+        ->assertSee('dashboard-next-availability-avatar-user-'.$user->id)
+        ->assertSee('dashboard-next-availability-avatar-user-'.$otherUser->id);
 });

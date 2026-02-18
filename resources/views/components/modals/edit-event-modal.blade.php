@@ -12,24 +12,14 @@
         <div>
             <flux:heading size="lg">{{ __('Edit Event') }}</flux:heading>
             <flux:text class="mt-2">
-                {{ __('Update the event title, event color, and which users are assigned to it.') }}
+                {{ __('Update the event title and which users are assigned to it.') }}
             </flux:text>
         </div>
 
-        <div class="grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
+        <input type="hidden" name="color" x-model="{{ $xEvent }}.color" />
+
+        <div class="grid gap-4 md:grid-cols-1 md:items-end">
             <flux:input name="name" :label="__('Event title')" x-model="{{ $xEvent }}.name" required />
-
-            <div class="grid gap-1">
-                <flux:label>{{ __('Color') }}</flux:label>
-                <div class="flex items-center gap-2">
-                    <input type="color" x-model="{{ $xEvent }}.color"
-                        class="h-10 w-12 rounded-md border border-zinc-300 bg-white p-1 dark:border-zinc-600 dark:bg-zinc-900">
-
-                    <flux:input name="color" x-model="{{ $xEvent }}.color"
-                        x-on:blur="{{ $xEvent }}.color = {{ $xEvent }}.color.toUpperCase()" class="w-28"
-                        placeholder="#2563EB" required />
-                </div>
-            </div>
         </div>
 
         <div class="space-y-2">

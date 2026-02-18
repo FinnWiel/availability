@@ -1,19 +1,30 @@
 <?php
 
-namespace App\Http\Requests\Admin;
+namespace App\Http\Requests\Event;
 
 use App\Models\Event;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class UpdateEventRequest extends FormRequest
+class UpdateManagedEventRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
      */
     public function authorize(): bool
     {
-        return $this->user()?->hasRole('admin') ?? false;
+        /** @var Event $event */
+        $event = $this->route('event');
+
+        if (! $this->user()) {
+            return false;
+        }
+
+        if ($this->user()->hasRole('admin')) {
+            return true;
+        }
+
+        return $event->created_by === $this->user()->id;
     }
 
     /**
@@ -84,8 +95,6 @@ class UpdateEventRequest extends FormRequest
     }
 
     /**
-     * Get the validation error messages.
-     *
      * @return array<string, string>
      */
     public function messages(): array
