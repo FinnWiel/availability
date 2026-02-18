@@ -152,7 +152,7 @@ new class extends Component
 ?>
 
 <div>
-    <flux:modal name="dashboard-widgets-modal" class="md:w-[36rem]">
+    <flux:modal name="dashboard-widgets-modal" class="md:w-xl">
         <div class="space-y-4">
             <div>
                 <flux:heading size="lg">{{ __('Customize widgets') }}</flux:heading>

@@ -7,8 +7,7 @@ use Illuminate\Support\Collection;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
-new class extends Component
-{
+new class extends Component {
     use InteractsWithDashboardWidgets;
 
     /**
@@ -77,7 +76,7 @@ new class extends Component
         </div>
 
         <flux:modal.trigger name="dashboard-widgets-modal">
-            <flux:button type="button" icon="paintbrush" variant="ghost"/>
+            <flux:button type="button" icon="paintbrush" variant="ghost" />
         </flux:modal.trigger>
     </div>
 
@@ -85,7 +84,7 @@ new class extends Component
 
     @php
         $enabledWidgets = collect($this->widgets)
-            ->filter(fn (array $widget): bool => $widget['enabled'])
+            ->filter(fn(array $widget): bool => $widget['enabled'])
             ->map(function (array $widget): ?array {
                 $definition = $this->definitions[$widget['id']] ?? null;
 
@@ -106,18 +105,15 @@ new class extends Component
             <flux:text>{{ __('No widgets enabled') }}</flux:text>
         </flux:card>
     @else
-        <div class="grid w-full grid-cols-1 gap-4 [grid-auto-rows:minmax(250px,25%)] md:grid-cols-4">
+        <div class="grid w-full grid-cols-1 gap-4 auto-rows:minmax(250px,25%) md:grid-cols-4">
             @foreach ($enabledWidgets as $widget)
-                @php
-                    $widgetClasses = [
-                        'md:col-span-'.max(1, min(4, (int) ($widget['col_span'] ?? 1))),
-                    ];
-                @endphp
+                    @php
+                        $widgetClasses = ['md:col-span-' . max(1, min(4, (int) ($widget['col_span'] ?? 1)))];
+                    @endphp
 
-                <div @class($widgetClasses)>
-                    <x-dynamic-component :component="$widget['component']"
-                        :next-availabilities-by-event="$this->nextAvailabilitiesByEvent" />
-                </div>
+                    <div @class($widgetClasses)>
+                        <x-dynamic-component :component="$widget['component']" :next-availabilities-by-event="$this->nextAvailabilitiesByEvent" />
+                    </div>
             @endforeach
         </div>
     @endif
