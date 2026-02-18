@@ -72,11 +72,12 @@ new class extends Component
                             <flux:table.cell variant="strong">{{ $user->name }}</flux:table.cell>
                             <flux:table.cell>{{ $user->email }}</flux:table.cell>
                             <flux:table.cell>
-                                @if ($user->hasRole('admin'))
-                                    <flux:badge color="sky">{{ __('Admin') }}</flux:badge>
-                                @else
-                                    <flux:badge>{{ __('User') }}</flux:badge>
-                                @endif
+                                @foreach ($user->getRoleNames() as $role)
+                                    <flux:text class="capitalize">{{ $role }}</flux:text>
+                                    @if(!$loop->last)
+                                        <span class="sr-only">,</span>
+                                    @endif
+                                @endforeach
                             </flux:table.cell>
                             <flux:table.cell align="end">
                                 <div class="flex justify-end gap-2">

@@ -24,8 +24,8 @@ test('non admin does not see management links in settings navigation', function 
     $response = $this->actingAs($user)->get(route('profile.edit'));
 
     $response->assertOk()
-        ->assertDontSee('Manage Users')
-        ->assertDontSee('Manage Events')
+        ->assertDontSee(route('admin.settings.users'))
+        ->assertDontSee('Users')
         ->assertSee('Profile');
 });
 
