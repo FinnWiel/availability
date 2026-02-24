@@ -14,8 +14,9 @@
         "laravel/fortify": "^1.30",
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1",
-        "livewire/flux": "^2.12",
-        "livewire/flux-pro": "^2.12",
+        "livewire/blaze": "^1.0",
+        "livewire/flux": "^2.12.1",
+        "livewire/flux-pro": "^2.12.1",
         "livewire/livewire": "^4.0",
         "spatie/laravel-permission": "^7.1"
     },
